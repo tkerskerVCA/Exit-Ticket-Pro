@@ -15,6 +15,7 @@ import {
 import { 
   getAuth, 
   signInAnonymously, 
+  signInWithCustomToken,
   onAuthStateChanged 
 } from 'firebase/auth';
 import { 
@@ -44,27 +45,25 @@ import {
 } from 'lucide-react';
 
 // --- Firebase Configuration ---
-// TO DO: Replace these values with your actual config from the Firebase Console
-const firebaseConfig = {
-  apiKey: "YOUR_FIREBASE_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
-};
+// Using environment variables for the preview environment, with fallbacks for manual deployment
+const firebaseConfig = typeof __firebase_config !== 'undefined' 
+  ? JSON.parse(__firebase_config) 
+  : {
+      apiKey: "YOUR_FIREBASE_API_KEY",
+      authDomain: "YOUR_PROJECT.firebaseapp.com",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_PROJECT.appspot.com",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const appId = 'exit-ticket-pro-v2'; 
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'exit-ticket-pro-v2'; 
 
 // --- Gemini API Helper ---
-/**
- * NOTE: If deploying to Vercel, you can use:
- * const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
- * * To fix local compilation errors in some environments, we use a standard string variable here.
- */
+// Recommendation: Paste your key from aistudio.google.com here!
 const apiKey = ""; 
 const GEMINI_MODEL = "gemini-2.5-flash-preview-09-2025";
 
@@ -110,7 +109,7 @@ const fetchConfusionAnalysis = async (question, responses) => {
   }
 };
 
-function App() {
+export default function App() {
   const [user, setUser] = useState(null);
   const [role, setRole] = useState(null); 
   const [currentQuestion, setCurrentQuestion] = useState(null);
@@ -120,10 +119,15 @@ function App() {
   const [studentName, setStudentName] = useState("");
   const [hasSubmitted, setHasSubmitted] = useState(false);
 
+  // RULE 3: Auth Before Queries - Initialize Auth FIRST
   useEffect(() => {
     const initAuth = async () => {
       try {
-        await signInAnonymously(auth);
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
       } catch (err) {
         console.error("Auth error:", err);
       }
@@ -136,8 +140,11 @@ function App() {
     return () => unsubscribe();
   }, []);
 
+  // RULE 3: Guard Firestore operations with 'if (!user) return;'
   useEffect(() => {
     if (!user) return;
+    
+    // RULE 1: Strict Paths
     const questionRef = doc(db, 'artifacts', appId, 'public', 'data', 'sessions', 'active');
     const responsesRef = collection(db, 'artifacts', appId, 'public', 'data', 'responses');
 
@@ -147,12 +154,12 @@ function App() {
       } else {
         setCurrentQuestion(null);
       }
-    }, (err) => console.error(err));
+    }, (err) => console.error("Question snapshot error:", err));
 
     const unsubResponses = onSnapshot(responsesRef, (snapshot) => {
       const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
       setResponses(data);
-    }, (err) => console.error(err));
+    }, (err) => console.error("Responses snapshot error:", err));
 
     return () => {
       unsubQuestion();
@@ -161,8 +168,10 @@ function App() {
   }, [user]);
 
   const startNewQuestion = async (qData) => {
+    if (!user) return;
     const sessionRef = doc(db, 'artifacts', appId, 'public', 'data', 'sessions', 'active');
     const responsesRef = collection(db, 'artifacts', appId, 'public', 'data', 'responses');
+    
     const oldDocs = await getDocs(responsesRef);
     await Promise.all(oldDocs.docs.map(d => deleteDoc(d.ref)));
 
@@ -176,6 +185,7 @@ function App() {
   };
 
   const endSession = async () => {
+    if (!user) return;
     const sessionRef = doc(db, 'artifacts', appId, 'public', 'data', 'sessions', 'active');
     await deleteDoc(sessionRef);
   };
@@ -193,20 +203,24 @@ function App() {
   };
 
   const runAnalysis = async () => {
-    if (!currentQuestion || responses.length === 0) return;
+    if (!user || !currentQuestion || responses.length === 0) return;
     setIsAnalyzing(true);
     try {
       const result = await fetchConfusionAnalysis(currentQuestion, responses);
       const sessionRef = doc(db, 'artifacts', appId, 'public', 'data', 'sessions', 'active');
       await setDoc(sessionRef, { ...currentQuestion, analysis: String(result) }, { merge: true });
     } catch (err) {
-      console.error(err);
+      console.error("Analysis error:", err);
     } finally {
       setIsAnalyzing(false);
     }
   };
 
-  if (loading) return <div className="flex items-center justify-center h-screen bg-slate-50"><Loader2 className="w-8 h-8 animate-spin text-indigo-600" /></div>;
+  if (loading) return (
+    <div className="flex items-center justify-center h-screen bg-slate-50">
+      <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+    </div>
+  );
 
   if (!role) {
     return (
@@ -553,5 +567,3 @@ function StudentView({ currentQuestion, submitResponse, studentName, setStudentN
     </div>
   );
 }
-
-export default App;
