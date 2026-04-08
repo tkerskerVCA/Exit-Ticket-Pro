@@ -46,16 +46,25 @@ import {
 
 // --- Firebase Configuration ---
 // Using environment variables for the preview environment, with fallbacks for manual deployment
-const firebaseConfig = typeof __firebase_config !== 'undefined' 
-  ? JSON.parse(__firebase_config) 
-  : {
-      apiKey: "YOUR_FIREBASE_API_KEY",
-      authDomain: "YOUR_PROJECT.firebaseapp.com",
-      projectId: "YOUR_PROJECT_ID",
-      storageBucket: "YOUR_PROJECT.appspot.com",
-      messagingSenderId: "YOUR_SENDER_ID",
-      appId: "YOUR_APP_ID"
-    };
+// const firebaseConfig = typeof __firebase_config !== 'undefined' 
+//  ? JSON.parse(__firebase_config) 
+//  : {
+//      apiKey: "YOUR_FIREBASE_API_KEY",
+//     authDomain: "YOUR_PROJECT.firebaseapp.com",
+//      projectId: "YOUR_PROJECT_ID",
+//      storageBucket: "YOUR_PROJECT.appspot.com",
+//      messagingSenderId: "YOUR_SENDER_ID",
+//      appId: "YOUR_APP_ID"
+//    };
+const firebaseConfig = {
+  apiKey: "AIzaSyAx7dvrZPcZWZFoRsATNz61kEtsulROAns",
+  authDomain: "gen-lang-client-0875595529.firebaseapp.com",
+  projectId: "gen-lang-client-0875595529",
+  storageBucket: "gen-lang-client-0875595529.firebasestorage.app",
+  messagingSenderId: "726631748325",
+  appId: "1:726631748325:web:e0527d9685c1fadc323a0c",
+  measurementId: "G-SN4JM56Z4N"
+};
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
